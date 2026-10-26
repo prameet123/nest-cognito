@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UseGuards } from '@nestjs/common';
 import { CognitoAuthGuard } from './cognito-auth.guard';
@@ -29,5 +39,29 @@ export class AuthController {
       username: request.user.username,
       message: 'Access token verified successfully',
     };
+  }
+
+  @Get('sso/callback')
+  ssoCallback(@Query('code') code?: string) {
+    if (!code) {
+      throw new BadRequestException('Missing authorization code');
+    }
+
+    // Temporary testing only: do not exchange the code here.
+    return {
+      message: 'Authorization code received',
+      codeReceived: true,
+      nextStep: 'Submit the code to POST /auth/sso/token',
+    };
+  }
+
+  @Post('sso/token')
+  @HttpCode(HttpStatus.OK)
+  async exchangeSsoToken(@Body() body: { code?: string }) {
+    if (!body.code || typeof body.code !== 'string') {
+      throw new BadRequestException('Authorization code is required');
+    }
+
+    return this.authService.exchangeSsoCode(body.code);
   }
 }

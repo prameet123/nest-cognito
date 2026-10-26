@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   CognitoIdentityProviderClient,
@@ -142,5 +146,45 @@ export class AuthService {
 
       throw error;
     }
+  }
+
+  async exchangeSsoCode(code: string) {
+    const domain = this.config.getOrThrow<string>('COGNITO_DOMAIN');
+
+    const clientId = this.config.getOrThrow<string>('COGNITO_CLIENT_ID');
+
+    const clientSecret = this.config.getOrThrow<string>(
+      'COGNITO_CLIENT_SECRET',
+    );
+
+    const redirectUri = this.config.getOrThrow<string>(
+      'COGNITO_SSO_CALLBACK_URL',
+    );
+
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
+      'base64',
+    );
+
+    const response = await fetch(`${domain}/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${credentials}`,
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        code,
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new UnauthorizedException('SSO authorization-code exchange failed');
+    }
+
+    return result;
   }
 }
